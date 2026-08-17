@@ -1,0 +1,28 @@
+# Datasets and large archives
+models/datasets/
+datasets/
+*.zip
+*.tar
+*.tar.gz
+*.7z
+*.rar
+
+# Machine Learning Weights & Checkpoints
+*.pt
+*.pth
+*.onnx
+*.engine
+*.bin
+*.h5
+*.pkl
+
+# Python & Environment
+__pycache__/
+*.pyc
+.ipynb_checkpoints/
+.venv/
+env/
+venv/
+.DS_Store
+.vscode/
+.idea/
