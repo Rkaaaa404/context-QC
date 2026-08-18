@@ -1,75 +1,64 @@
-# Model 1 (Fish Freshness Classifier) — Execution Guide & Kaggle Pipeline
+# Model 1 (Fish Freshness Classifier) — Pipeline Guide & Analysis
+### Proyek NusaQC · COMPFEST 18 AIC (Smart Manufacturing Track)
 
-Dokumen ini berisi panduan alur kerja (*step-by-step pipeline*) untuk melatih **Model 1: Fish Freshness Classifier (MobileNetV3-Small INT8 ONNX)** pada platform Kaggle tanpa menguras kuota GPU.
-
----
-
-## 1. Strategi Efisiensi Kuota GPU Kaggle (2-Step Notebook Architecture)
-
-Untuk menghindari pemborosan kuota GPU Kaggle akibat proses unzipping, pemindaian direktori yang lambat, atau *resizing* berulang setiap epoch:
-
-```
-┌────────────────────────────────────────────────────────────────────────┐
-│ STEP 1: PREPROCESSING NOTEBOOK (Kaggle CPU / Local)                    │
-│ Input  : Raw DaFiF & FFE Datasets                                      │
-│ Action : Map Grade A/B/C, Resize 224x224, Train/Val/Test Split          │
-│ Output : `/kaggle/working/nusaqc_freshness_processed.zip`              │
-│          -> Simpan sebagai New Kaggle Dataset (`nusaqc-freshness-proc`) │
-└────────────────────────────────────────────────────────────────────────┘
-                                   │
-                                   ▼ (Attach Dataset ke Notebook 2)
-┌────────────────────────────────────────────────────────────────────────┐
-│ STEP 2: TRAINING NOTEBOOK (Kaggle GPU T4 / P100)                       │
-│ Input  : `/kaggle/input/nusaqc-freshness-proc`                         │
-│ Action : PyTorch Training (MobileNetV3), Fine-Tuning, Metrics Eval    │
-│ Output : `mobilenetv3_freshness.onnx` & `mobilenetv3_freshness_int8.onnx`│
-└────────────────────────────────────────────────────────────────────────┘
-```
+Dokumen ini menjelaskan alur kerja (*pipeline*), panduan eksekusi di Kaggle, interpretasi artefak visual, serta analisis ilmiah dari hasil pengujian model **NusaQC Model 1: Freshness Engine (MobileNetV3 INT8 ONNX)**.
 
 ---
 
-## 2. Definisi Path Dataset di Kaggle
+## 1. Arsitektur Single-File All-in-One Pipeline
 
-### Input Dataset Path (Raw):
-* **DaFiF Base Path:**
-  `/kaggle/input/datasets/raykapranandita/dataset-for-fishs-freshness-problems/Dataset for Fishs Freshness Problems`
-* **FFE Base Path:**
-  `/kaggle/input/datasets/raykapranandita/the-freshness-of-the-fish-eyes-dataset-ffe`
+Seluruh alur dari **EDA**, **Dual-Split**, **Class-Weighted Training**, **Secondary FFE Validation**, **Visualisasi**, **ONNX Export (Opset 17)**, hingga **Benchmarking Latensi CPU** dikemas dalam satu file:
+👉 **[`01_model1_full_pipeline.py`](file:///d:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/01_model1_full_pipeline.py)**
 
-### Rules Pemetaan Grade (SNI 2729:2013 & Organoleptik):
-1. **DaFiF Dataset:**
-   * `Day 1` & `Day 2` $\rightarrow$ **Grade A** (Freshness score 8.0 – 9.0)
-   * `Day 3` s/d `Day 6` $\rightarrow$ **Grade B** (Freshness score 6.0 – 7.9)
-   * `Day 7` s/d `Day 11` $\rightarrow$ **Grade C** (Freshness score 1.0 – 5.9)
-2. **FFE Dataset:**
-   * Folder berakhiran `- Highly Fresh` $\rightarrow$ **Grade A**
-   * Folder berakhiran `- Fresh` $\rightarrow$ **Grade B**
-   * Folder berakhiran `- Not Fresh` $\rightarrow$ **Grade C**
+### Keunggulan Utama Pipeline:
+1. **Ultra-Fast In-Memory Preload (`FastRAMFishDataset`):** Mengeliminasi bottleneck disk I/O Kaggle dengan me-resize dan menyimpan seluruh dataset ke RAM saat inisialisasi (~15 detik). Seluruh training 12 epoch selesai dalam < 2 menit di GPU T4/P100.
+2. **Autodiscovery Dataset:** Mendukung path input Kaggle resmi, symlink, maupun direktori lokal secara otomatis.
+3. **Class-Weighted CrossEntropyLoss:** Menyeimbangkan bobot kelas minoritas (Grade A hanya 15.8% vs Grade C 47.2%).
+4. **Anti-Leakage Spatial Augmentation:** Regularisasi `RandomErasing` (Cutout) dan `ColorJitter` untuk mencegah CNN overfit pada latar meja laboratorium DaFiF.
+5. **Fixed ONNX Opset 17 & Dynamic INT8 Quantization:** Kompatibel dengan PyTorch 2.x, terbebas dari error Dynamo/onnxscript, dan menghasilkan INT8 yang tervalidasi.
+6. **Edge Latency Benchmarking:** Pengujian latensi CPU otomatis (ms/frame dan FPS) untuk validasi kesiapan edge computing (Raspberry Pi 5).
 
 ---
 
-## 3. Struktur File Script Python
+## 2. Peta Artefak Visual yang Dihasilkan
 
-Semua script dibuat modular di direktori `model-1/`:
-1. [`01_preprocess_dataset.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/main/model-1/01_preprocess_dataset.py) — Script Preprocessing & Data Harmonization (Kaggle CPU)
-2. [`02_train_mobilenetv3.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/main/model-1/02_train_mobilenetv3.py) — Script Training, Evaluation & ONNX Quantization (Kaggle GPU)
+Setelah script dijalankan, folder `/kaggle/working/output_model1/` akan berisi artefak beresolusi tinggi (300 DPI) berikut yang siap dilampirkan pada Proposal:
+
+| Nama File Artefak | Deskripsi & Isi Visual | Kegunaan dalam Proposal |
+| :--- | :--- | :--- |
+| `eda_dataset_distribution.png` | 4 chart: Distribusi Kelas DaFiF, Distribusi Kelas per Spesies, Degradasi Mutu per Hari (Day 1–11), dan Perbandingan DaFiF vs FFE. | **Bab 2: Data Acquisition & EDA** |
+| `eda_sample_images_by_grade.png` | Grid foto asli ikan DaFiF untuk Grade A, Grade B, dan Grade C beserta metadata spesies, hari, dan sesi. | **Bab 2 / Lampiran Visualisasi Citra** |
+| `training_curves_comparison.png` | Kurva perbandingan Loss, Accuracy (%), dan Macro F1 per epoch untuk Random Split vs Grouped Split. | **Bab 3: Eksperimen & Analisis Konvergensi** |
+| `confusion_matrices_all.png` | Matriks kebingungan (Raw Counts & Normalized %) untuk Random Split, Grouped Split, dan FFE Cross-Validation. | **Bab 3: Evaluasi Kinerja Model & Safety Critical Metric** |
+| `sample_test_predictions_grid.png` | Grid prediksi citra test set yang menampilkan probabilitas kepercayaan dan status *CORRECT* (Hijau) / *MISCLASSIFIED* (Merah). | **Bab 3: Error Analysis & Validasi Kualitatif** |
+| `mobilenetv3_freshness.onnx` | Model ONNX Float32 (Opset 17) tervalidasi (~3.5 MB). | Model Artefak untuk FastAPI Backend |
+| `mobilenetv3_freshness_int8.onnx` | Model ONNX INT8 Terkuantisasi (~1.0 MB). | Model Artefak untuk Edge Device (Raspberry Pi 5) |
 
 ---
 
-## 4. Langkah Imputasi & Eksekusi di Kaggle
+## 3. Bedah Ilmiah Hasil Evaluasi (Data Leakage & Domain Shift)
 
-### Langkah Step 1:
-1. Buat **Kaggle Notebook Baru (CPU Accelerator)**.
-2. Hubungkan 2 dataset input Kaggle kamu:
-   - `dataset-for-fishs-freshness-problems`
-   - `the-freshness-of-the-fish-eyes-dataset-ffe`
-3. Paste / Jalankan kode dari [`01_preprocess_dataset.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/main/model-1/01_preprocess_dataset.py).
-4. Klik **Save Version** $\rightarrow$ **Save & Run All (Commit)**.
-5. Setelah selesai, buka Output Notebook, klik **"Save as Dataset"** dengan nama dataset: `nusaqc-freshness-processed`.
+### A. Random Split (99.48% Acc, 0.9939 F1) — *Spatiotemporal Leakage*
+* **Penyebab:** Pada dataset DaFiF, 10 ekor ikan dipotret berulang kali dalam satu sesi. Pada Random Split, foto ikan yang sama pada pencahayaan dan sudut serupa tersebar di train dan test set.
+* **Kesimpulan:** Akurasi 99.48% adalah hasil *artificially inflated* karena model menghafal spesimen dan latar laboratorium.
 
-### Langkah Step 2:
-1. Buat **Kaggle Notebook Baru (GPU T4 / P100 Accelerator)**.
-2. Attach dataset buatanmu: `nusaqc-freshness-processed`.
-3. Paste / Jalankan kode dari [`02_train_mobilenetv3.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/main/model-1/02_train_mobilenetv3.py).
-4. Training akan berjalan cepat (100% efisiensi GPU).
-5. Unduh file `mobilenetv3_freshness_int8.onnx` untuk diintegrasikan ke FastAPI & Raspberry Pi 5!
+### B. Grouped Split by Day/Session (80.00% Acc, 0.7496 F1) — *Generalisasi Realistis*
+* **Penyebab:** Ketika sesi dipisahkan total, model diuji pada sesi/hari baru yang belum pernah dilihat saat training.
+* **Kesimpulan:** 80.00% adalah performa jujur dan realistis model DaFiF. Inilah nilai yang harus diangkat dalam proposal sebagai benchmark integritas engineering.
+
+### C. Secondary Validation FFE (36.29% Acc, 0.2966 F1) — *Modality & Domain Gap*
+* **Penyebab:** DaFiF adalah foto *whole-body*, sedangkan FFE adalah *macro close-up* murni pada kornea mata ikan. Fitur tubuh/insang/latar yang dipelajari dari DaFiF tidak ada pada FFE.
+* **Kesimpulan:** Menjadi bukti ilmiah kuat di proposal bahwa model conveyor whole-body memerlukan kamera bersudut makro khusus jika ingin melakukan inspeksi berbasis mata murni.
+
+---
+
+## 4. Panduan Eksekusi di Kaggle
+
+1. Buka [Kaggle Notebook](https://www.kaggle.com/).
+2. Pasang Accelerator: **GPU T4 / P100**.
+3. Tambahkan 2 dataset input:
+   - `raykapranandita/dataset-for-fishs-freshness-problems`
+   - `raykapranandita/the-freshness-of-the-fish-eyes-dataset-ffe`
+4. Copy-paste isi [`01_model1_full_pipeline.py`](file:///d:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/01_model1_full_pipeline.py) ke dalam notebook cell.
+5. Jalankan (**Run All**). Waktu eksekusi rata-rata: **~2 menit**.
+6. Unduh folder `/kaggle/working/output_model1/` untuk mengambil seluruh grafik visual dan bobot model `.onnx`.

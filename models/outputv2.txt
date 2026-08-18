@@ -1,0 +1,84 @@
+Ultralytics 8.4.121 🚀 Python-3.12.13 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14912MiB)
+Model summary (fused): 73 layers, 11,127,132 parameters, 0 gradients, 28.4 GFLOPs
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 21/21 2.8it/s 7.5s
+                   all        642        720      0.775      0.676      0.723      0.422
+            sisik_sisa         97        141      0.738       0.62      0.669      0.358
+        warna_abnormal        256        360      0.907      0.694      0.826      0.502
+          luka_robekan         72        112      0.728      0.661      0.672      0.425
+       lendir_berlebih         79        107      0.725      0.729      0.726      0.403
+Speed: 0.3ms preprocess, 7.2ms inference, 0.0ms loss, 1.7ms postprocess per image
+Results saved to /kaggle/working/runs_model2/nusaqc_yolov8s_v2
+
+Ultralytics 8.4.121 🚀 Python-3.12.13 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14912MiB)
+Model summary (fused): 73 layers, 11,127,132 parameters, 0 gradients, 28.4 GFLOPs
+val: Fast image access ✅ (ping: 0.0±0.0 ms, read: 321.2±167.1 MB/s, size: 7.5 KB)
+val: Scanning /kaggle/working/nusaqc_clean_dataset/valid/labels.cache... 642 images, 141 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 642/642 207.1Mit/s 0.0s
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 41/41 3.2it/s 12.6s
+                   all        642        720      0.777      0.676      0.723      0.422
+            sisik_sisa         97        141      0.744      0.619      0.669      0.357
+        warna_abnormal        256        360      0.907      0.694      0.827      0.503
+          luka_robekan         72        112      0.732      0.661      0.671      0.425
+       lendir_berlebih         79        107      0.725      0.729      0.727      0.403
+Speed: 1.6ms preprocess, 15.3ms inference, 0.0ms loss, 0.7ms postprocess per image
+Results saved to /kaggle/working/runs/detect/val
+  • Precision : 0.7770
+  • Recall    : 0.6759
+  • mAP@50    : 0.7235
+  • mAP@50-95 : 0.4220
+
+📊 Evaluasi TTA (Test-Time Augmentation)...
+Ultralytics 8.4.121 🚀 Python-3.12.13 torch-2.10.0+cu128 CUDA:0 (Tesla T4, 14912MiB)
+val: Fast image access ✅ (ping: 0.0±0.0 ms, read: 437.3±416.2 MB/s, size: 16.9 KB)
+val: Scanning /kaggle/working/nusaqc_clean_dataset/valid/labels.cache... 642 images, 141 backgrounds, 0 corrupt: 100% ━━━━━━━━━━━━ 642/642 299.2Mit/s 0.0s
+                 Class     Images  Instances      Box(P          R      mAP50  mAP50-95): 100% ━━━━━━━━━━━━ 41/41 1.5it/s 27.7s
+                   all        642        720      0.765      0.679      0.726      0.457
+            sisik_sisa         97        141      0.703      0.605      0.646      0.392
+        warna_abnormal        256        360      0.898      0.714      0.832      0.543
+          luka_robekan         72        112       0.74      0.659      0.666      0.431
+       lendir_berlebih         79        107      0.718      0.737      0.759      0.463
+Speed: 1.6ms preprocess, 38.6ms inference, 0.0ms loss, 0.7ms postprocess per image
+Results saved to /kaggle/working/runs/detect/val-2
+  [TTA] Precision : 0.7646
+  [TTA] Recall    : 0.6788
+  [TTA] mAP@50    : 0.7258
+  [TTA] mAP@50-95 : 0.4573
+
+══════════════════════════════════════════════════════════════════════
+📋 PER-CLASS PERFORMANCE REPORT (v2 vs Baseline)
+══════════════════════════════════════════════════════════════════════
+Kelas                 v2 mAP@50   Baseline   Δ Change   Status
+──────────────────────────────────────────────────────────────────────
+  sisik_sisa             0.3574     0.6760    -0.3186  ⚠️ DOWN
+  warna_abnormal         0.5025     0.8360    -0.3335  ⚠️ DOWN
+  luka_robekan           0.4250     0.6420    -0.2170  ⚠️ DOWN
+  lendir_berlebih        0.4031     0.7300    -0.3269  ⚠️ DOWN
+──────────────────────────────────────────────────────────────────────
+
+══════════════════════════════════════════════════════════════════════
+📊 OVERALL COMPARISON: v2 vs Baseline
+══════════════════════════════════════════════════════════════════════
+  ✅ precision   : 0.7700 → 0.7770 (+0.0070, +0.9%)
+  ⚠️ recall      : 0.6830 → 0.6759 (-0.0071, -1.0%)
+  ✅ mAP50       : 0.7210 → 0.7235 (+0.0025, +0.3%)
+  ⚠️ mAP50-95    : 0.4770 → 0.4220 (-0.0550, -11.5%)
+══════════════════════════════════════════════════════════════════════
+
+🎯 Target Achievement:
+  ❌ mAP50: 0.7235 (target ≥ 0.80)
+  ❌ recall: 0.6759 (target ≥ 0.75)
+  ❌ mAP50-95: 0.4220 (target ≥ 0.55)
+
+⚠️ Beberapa target belum tercapai — pertimbangkan iterasi lanjutan.
+
+ONNX: starting export with onnx 1.22.0 opset 20...
+ONNX: slimming with onnxslim 0.1.96...
+ONNX: export success ✅ 3.7s, saved as '/kaggle/working/runs_model2/nusaqc_yolov8s_v2/weights/best.onnx' (42.7 MB)
+
+Export complete (4.3s)
+Results saved to /kaggle/working/runs_model2/nusaqc_yolov8s_v2/weights/best.onnx
+Predict:         yolo predict task=detect model=/kaggle/working/runs_model2/nusaqc_yolov8s_v2/weights/best.onnx imgsz=640 
+Validate:        yolo val task=detect model=/kaggle/working/runs_model2/nusaqc_yolov8s_v2/weights/best.onnx imgsz=640 data=/kaggle/working/data.yaml  
+Visualize:       https://netron.app
+✅ ONNX exported: /kaggle/working/runs_model2/nusaqc_yolov8s_v2/weights/best.onnx
+  ✓ best.pt -> /kaggle/working/best.pt
+  ✓ ONNX -> /kaggle/working/model2_defect_detector.onnx
