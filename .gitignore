@@ -26,3 +26,7 @@ venv/
 .DS_Store
 .vscode/
 .idea/
+
+# AI folder exception (do not ignore AI models/files)
+!AI/
+!AI/**
