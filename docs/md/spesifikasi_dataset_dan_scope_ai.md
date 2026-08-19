@@ -9,8 +9,8 @@
 Dokumen ini memetakan secara presisi integrasi antara **Visi Sistem NusaQC** (sebagaimana dirumuskan dalam [`FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md)), **Rencana Struktur Proposal** ([`Rencana Struktur Proposal.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/Rencana%20Struktur%20Proposal.md)), **Rekomendasi Scope Spesies** ([`ideation/Rekomendasi_Scope_Spesies_NusaQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Rekomendasi_Scope_Spesies_NusaQC.md)), serta struktur fisik dataset aktual ([`treeDaFiF.txt`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/treeDaFiF.txt), [`treeFFE.txt`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/treeFFE.txt), [`docs/md/dafif.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/dafif.md), dan [`datasets.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/datasets.md)).
 
 ### Core AI Architecture: Dual-Engine Pipeline
-1. **Model 1 — Fish Freshness Classifier (MobileNetV3-Small INT8 ONNX):** Mengklasifikasikan kesegaran fisik berdasarkan standar organoleptik **SNI 2729:2013** menjadi 3 grade (**Grade A** / **Grade B** / **Grade C**).
-2. **Model 2 — Surface Contamination & Defect Detector (YOLOv8n ONNX):** Mendeteksi cacat fisik visual dan kontaminasi permukaan luar dengan *bounding box* untuk 5 kelas standar: `sisik_sisa`, `warna_abnormal`, `luka_robekan`, `foreign_object`, dan `lendir_berlebih`.
+1. **Model 1 — Fish Freshness Classifier (MobileNetV3-Small ONNX Float32):** Mengklasifikasikan kesegaran fisik berdasarkan standar organoleptik **SNI 2729:2013** menjadi 3 grade (**Grade A** / **Grade B** / **Grade C**) dengan model ultra-kompak (0.28 MB) dan latensi 2.44 ms.
+2. **Model 2 — Surface Contamination & Defect Detector (YOLOv8s ONNX):** Mendeteksi cacat fisik visual dan kontaminasi permukaan luar dengan *bounding box* untuk 4 kelas cacat utama NusaQC (`sisik_sisa`, `warna_abnormal`, `luka_robekan`, `lendir_berlebih`).
 
 ---
 
@@ -184,8 +184,8 @@ Dengan pipeline ini, dataset klasifikasi raksasa (seperti BD Fish & SalmonScan) 
 
 | Sub-Engine | Model Backbone | Dataset Sumber | Total Gambar Final | Split (70% Train / 15% Val / 15% Test) | Output Model |
 |:---|:---|:---|:---:|:---:|:---|
-| **Model 1 (Freshness)** | MobileNetV3-Small INT8 ONNX | DaFiF (Dataset 3) + FFE (Dataset 4) | **6.926** | 4.848 Train / 1.039 Val / 1.039 Test | Grade A / B / C + Confidence Score |
-| **Model 2 (Defect Detector)** | YOLOv8n Float32 ONNX | Roboflow (Dataset 6) + Pseudo-Labeled SalmonScan (Dataset 2) & BD Fish (Dataset 1) | **7.857** | 5.500 Train / 1.178 Val / 1.179 Test | Bounding Box + 5 Defect Labels + PASS/FAIL |
+| **Model 1 (Freshness)** | MobileNetV3-Small ONNX Float32 (0.28 MB) | DaFiF (Primary) + FFE (Secondary) | **2.536 (DaFiF)** | Grouped Split (by Session/Day) | Grade A / B / C + Confidence Score |
+| **Model 2 (Defect Detector)** | YOLOv8s Float32 ONNX | NusaQC Cleaned Defect Dataset | **1.861 BBoxes** | 70% Train / 15% Val / 15% Test | Bounding Box + 4 Defect Labels + PASS/FAIL |
 
 ---
 

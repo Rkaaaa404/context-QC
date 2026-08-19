@@ -21,16 +21,16 @@ Dokumen ini merangkum seluruh diskusi, evaluasi jurnal, analisis pemenang terdah
 ## 3. Bedah Temuan Kritis: Data Leakage & Domain Shift
 Berdasarkan hasil eksperimen Kaggle, ditemukan temuan penting yang harus diangkat dalam proposal sebagai bukti integritas riset dan keunggulan engineering NusaQC:
 
-1. **Random Split (99.48% Akurasi, 0.9939 F1):**
+1. **Random Split (99.48% Akurasi, 0.9958 F1):**
    * *Diagnosa:* Terjadi **Spatiotemporal Data Leakage**. Karena hanya ada 10 ikan per spesies yang dipotret berulang kali, Random Split menyebabkan foto dari ikan dan sesi yang sama tersebar di train dan test set. Model menghafal spesimen individu dan latar belakang laboratorium.
-2. **Grouped Split by Day/Session (80.00% Akurasi, 0.7496 F1):**
-   * *Diagnosa:* Performa **Generalisasi Realistis**. Ketika seluruh sesi dan hari diisolasi, akurasi menjadi 80.00% dengan Recall Grade C sebesar 82.86%. Nilai ini adalah estimasi jujur kesiapan model di lini produksi nyata.
-3. **Secondary Test pada FFE (36.29% Akurasi):**
+2. **Grouped Split by Day/Session (75.75% Akurasi, 0.6648 F1, Recall C: 84.64%):**
+   * *Diagnosa:* Performa **Generalisasi Realistis**. Ketika seluruh sesi dan hari diisolasi, akurasi menjadi 75.75% dengan Recall Grade C (*Safety Critical*) mencapai **84.64%** (dari 280 sampel ikan busuk, 237 dicegat, hanya 2.5% salah ke Grade A). Nilai ini adalah estimasi jujur kesiapan model di lini produksi nyata.
+3. **Secondary Test pada FFE (41.70% Akurasi, 0.3032 F1):**
    * *Diagnosa:* **Modality & Field-of-View Mismatch**. DaFiF memotret tubuh dan kepala ikan secara utuh, sedangkan FFE adalah *macro close-up* pada mata. Fitur CNN yang mengekstraksi tubuh/insang/latar tidak dapat digeneralisasi langsung ke citra makro pupil tanpa model lokalisasi ROI khusus.
 
 ---
 
-## 4. Keputusan Rekayasa Pipeline (Updated v2)
+## 4. Keputusan Rekayasa Pipeline
 
 ### A. All-in-One Fast In-Memory Script:
 Pipeline digabung menjadi satu file terpadu yang mengeksekusi seluruh siklus secara otomatis dalam < 2 menit:
@@ -45,8 +45,8 @@ Pipeline digabung menjadi satu file terpadu yang mengeksekusi seluruh siklus sec
    - `training_curves_comparison.png`: Kurva Loss, Accuracy, dan F1 train vs val per epoch.
    - `confusion_matrices_all.png`: Matriks kebingungan (raw counts & normalized %).
    - `sample_test_predictions_grid.png`: Visualisasi prediksi benar vs misklasifikasi.
-4. **Fixed ONNX Export (Opset 17) & INT8 Dynamic Quantization:** Menghilangkan error konversi PyTorch Dynamo dan `ShapeInferenceError` pada ONNX Runtime.
-5. **CPU Latency Benchmarking:** Pengujian latensi CPU (ms/frame) dan FPS untuk simulasi edge device Raspberry Pi 5.
+4. **Native ONNX Float32 Export (Opset 18):** Ekspor model ultra-kompak (**0.28 MB / 280 KB**) yang langsung kompatibel dengan PyTorch 2.x tanpa version conversion warning.
+5. **Edge Latency Benchmarking:** Pengujian latensi CPU multi-thread (**2.44 ms/frame / 409 FPS**) membuktikan kesiapan deployment edge device (Raspberry Pi 5), 61x lebih cepat dari batas aman 150 ms.
 
 ---
 
@@ -54,9 +54,9 @@ Pipeline digabung menjadi satu file terpadu yang mengeksekusi seluruh siklus sec
 
 | Metrik Evaluasi | Random Split (Baseline) | Grouped Split (Honest) | Secondary FFE Test |
 | :--- | :--- | :--- | :--- |
-| **Akurasi Global** | 99.48% | 80.00% | 36.29% |
-| **Macro F1-Score** | 0.9939 | 0.7496 | 0.2966 |
-| **Recall Grade C (Safety Critical)** | 1.0000 | 0.8286 | 0.0256 |
+| **Akurasi Global** | 99.48% | 75.75% | 41.70% |
+| **Macro F1-Score** | 0.9958 | 0.6648 | 0.3032 |
+| **Recall Grade C (Safety Critical)** | 1.0000 | 0.8464 | 0.0352 |
 | **Status Interpretasi** | *Artificially Inflated (Leakage)* | *Production Benchmark* | *Domain Mismatch* |
 
 *Dokumen ini diperbarui sebagai acuan resmi engineering Model 1 NusaQC COMPFEST 18.*

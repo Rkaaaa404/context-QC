@@ -311,47 +311,43 @@ BASELINE_METRICS = {
 
 HPARAMS = {
     # --- Core Training ---
-    'epochs': 200,              # 100→200: val loss masih turun di epoch 100
-    'batch': 16,                # tetap (optimal untuk Kaggle T4 16GB VRAM)
-    'imgsz': 800,               # 640→800: tangkap defek kecil, deploy tetap 640px
-    'cos_lr': True,             # BARU: cosine LR decay → smooth convergence akhir
+    'epochs': 200,              # Konvergensi penuh dengan cosine LR
+    'batch': 16,                # optimal untuk Kaggle T4 16GB VRAM
+    'imgsz': 800,               # 800px: resolusi tinggi untuk mendeteksi defek mikro sisik & robekan
+    'cos_lr': True,             # Cosine learning rate decay
 
     # --- Optimizer ---
     'optimizer': 'AdamW',
-    'lr0': 0.0008,              # 0.001→0.0008: smoother gradient updates
-    'lrf': 0.005,               # 0.01→0.005: lower final LR untuk fine-grained tuning
+    'lr0': 0.001,
+    'lrf': 0.01,
     'momentum': 0.937,
-    'weight_decay': 0.0005,     # 0.001→0.0005: dataset 3.2k cukup besar, kurangi regularisasi
-    'warmup_epochs': 3.0,       # 5→3: pretrained model butuh warmup lebih pendek
+    'weight_decay': 0.0005,
+    'warmup_epochs': 3.0,
 
-    # --- Augmentation (Agresif untuk dataset kecil + class imbalance) ---
-    'mosaic': 1.0,
-    'close_mosaic': 20,         # 15→20: matikan mosaic lebih lambat, beri waktu belajar layout
-    'mixup': 0.25,              # 0.15→0.25: lebih banyak variasi inter-class boundary
-    'copy_paste': 0.3,          # 0.2→0.3: paste lebih banyak defek kecil ke gambar lain
-    'erasing': 0.3,             # BARU: random erasing → regularisasi & occlusion robustness
+    # --- Augmentation (Preservasi Tekstur Sisik Halus & Small Defects) ---
+    'mosaic': 0.85,             # 1.0 -> 0.85: beri porsi citra tunggal utuh
+    'close_mosaic': 25,         # matikan mosaic 25 epoch terakhir agar model adaptasi ke citra asli
+    'mixup': 0.08,              # kurangi mixup agar tekstur sisik halus tidak blur
+    'copy_paste': 0.25,         # paste defek proporsional untuk menyeimbangkan kelas minoritas
+    'erasing': 0.10,            # kurangi occlusion berlebih pada defek mikro
     'hsv_h': 0.015,
     'hsv_s': 0.7,
     'hsv_v': 0.4,
-    'scale': 0.65,              # 0.5→0.65: variasi skala lebih luas (defek besar & kecil)
+    'scale': 0.30,              # 0.60 -> 0.30: cegah defek sisik menyusut hingga hilang
     'fliplr': 0.5,
     'flipud': 0.1,
-    'translate': 0.2,
-    'degrees': 15.0,            # 10→15: ikan bisa berbagai posisi di konveyor
-    'perspective': 0.0003,      # BARU: sedikit perspektif (kamera overhead angle)
-    'shear': 3.0,               # BARU: shear kecil untuk variasi sudut pandang
+    'translate': 0.10,
+    'degrees': 10.0,
+    'perspective': 0.0002,
+    'shear': 2.0,
 
     # --- Loss Weights (Rebalanced) ---
-    'box': 8.5,                 # 7.5→8.5: boost lokalisasi (mAP@50-95 masih 0.477)
-    'cls': 2.5,                 # 1.5→2.5: push klasifikasi lebih keras (4 kelas mirip)
-    'dfl': 2.0,                 # 1.5→2.0: distribusi focal loss presisi lokasi
-
-    # --- Class Imbalance Handling ---
-    'cls_pw': 1.0,              # BARU: inverse-frequency class weighting (0=disable, 1=full)
-                                # Mengatasi imbalance warna_abnormal 3.25x vs sisik_sisa
+    'box': 7.5,                 # bobot lokalisasi presisi tinggi
+    'cls': 1.8,                 # perkuat klasifikasi fitur defek
+    'dfl': 1.8,                 # focal loss presisi batas bounding box
 
     # --- Early Stopping ---
-    'patience': 50,             # 30→50: beri waktu konvergensi penuh di 200 epoch
+    'patience': 50,
 }
 
 print("⚙️ Hyperparameters Improved Training v2:")
@@ -415,9 +411,9 @@ plot_results(RUN_DIR)
 best_pt = RUN_DIR / "weights" / "best.pt"
 eval_model = YOLO(str(best_pt)) if best_pt.exists() else model
 
-# --- Standard Evaluation ---
-print("\n📊 Evaluasi Model v2 pada Validation Split...")
-metrics = eval_model.val(data=str(DATA_YAML), split='val')
+# --- Standard Evaluation (imgsz=800 untuk konsistensi resolusi deteksi defek mikro) ---
+print("\n📊 Evaluasi Model v2 pada Validation Split (imgsz=800)...")
+metrics = eval_model.val(data=str(DATA_YAML), split='val', imgsz=800)
 
 v2_metrics = {
     'precision': metrics.box.mp,
@@ -432,8 +428,8 @@ print(f"  • mAP@50    : {v2_metrics['mAP50']:.4f}")
 print(f"  • mAP@50-95 : {v2_metrics['mAP50-95']:.4f}")
 
 # --- Test-Time Augmentation (TTA) Evaluation ---
-print("\n📊 Evaluasi TTA (Test-Time Augmentation)...")
-metrics_tta = eval_model.val(data=str(DATA_YAML), split='val', augment=True)
+print("\n📊 Evaluasi TTA (Test-Time Augmentation, imgsz=800)...")
+metrics_tta = eval_model.val(data=str(DATA_YAML), split='val', imgsz=800, augment=True)
 print(f"  [TTA] Precision : {metrics_tta.box.mp:.4f}")
 print(f"  [TTA] Recall    : {metrics_tta.box.mr:.4f}")
 print(f"  [TTA] mAP@50    : {metrics_tta.box.map50:.4f}")
@@ -443,20 +439,22 @@ print(f"  [TTA] mAP@50-95 : {metrics_tta.box.map:.4f}")
 # # 6c. Perbandingan v2 vs Baseline & Visualisasi
 
 # %%
-# --- Per-Class Detailed Report ---
-print("\n" + "═" * 70)
+# --- Per-Class Detailed Report (Fixed mAP@50 Calculation) ---
+print("\n" + "═" * 80)
 print("📋 PER-CLASS PERFORMANCE REPORT (v2 vs Baseline)")
-print("═" * 70)
+print("═" * 80)
 if hasattr(metrics.box, 'maps') and len(metrics.box.maps) == len(NUSAQC_CLASS_NAMES):
-    print(f"{'Kelas':<20} {'v2 mAP@50':>10} {'Baseline':>10} {'Δ Change':>10} {'Status':>8}")
-    print("─" * 70)
+    ap50_per_class = metrics.box.ap50 if (hasattr(metrics.box, 'ap50') and len(metrics.box.ap50) > 0) else (metrics.box.all_ap[:, 0] if hasattr(metrics.box, 'all_ap') else metrics.box.maps)
+    print(f"{'Kelas':<18} {'v2 mAP50':>10} {'Base mAP50':>11} {'Δ mAP50':>10} {'v2 mAP50-95':>12} {'Status':>8}")
+    print("─" * 80)
     for i, cls_name in enumerate(NUSAQC_CLASS_NAMES):
-        v2_val = metrics.box.maps[i]
+        v2_p50 = float(ap50_per_class[i])
+        v2_p95 = float(metrics.box.maps[i])
         baseline_val = BASELINE_METRICS['per_class_mAP50'].get(cls_name, 0)
-        delta = v2_val - baseline_val
+        delta = v2_p50 - baseline_val
         status = "✅ UP" if delta > 0 else ("⚠️ DOWN" if delta < 0 else "➡️ SAME")
-        print(f"  {cls_name:<18} {v2_val:>10.4f} {baseline_val:>10.4f} {delta:>+10.4f} {status:>8}")
-    print("─" * 70)
+        print(f"  {cls_name:<16} {v2_p50:>10.4f} {baseline_val:>11.4f} {delta:>+10.4f} {v2_p95:>12.4f} {status:>8}")
+    print("─" * 80)
 
 # --- Baseline Comparison Summary ---
 print("\n" + "═" * 70)
@@ -488,11 +486,12 @@ else:
 
 # --- mAP@50 Per-Class Bar Chart (v2 vs Baseline) ---
 if hasattr(metrics.box, 'maps') and len(metrics.box.maps) == len(NUSAQC_CLASS_NAMES):
+    ap50_per_class = metrics.box.ap50 if (hasattr(metrics.box, 'ap50') and len(metrics.box.ap50) > 0) else (metrics.box.all_ap[:, 0] if hasattr(metrics.box, 'all_ap') else metrics.box.maps)
     fig, ax = plt.subplots(figsize=(12, 6))
     x = np.arange(len(NUSAQC_CLASS_NAMES))
     width = 0.35
     baseline_vals = [BASELINE_METRICS['per_class_mAP50'][c] for c in NUSAQC_CLASS_NAMES]
-    v2_vals = list(metrics.box.maps)
+    v2_vals = [float(ap50_per_class[i]) for i in range(len(NUSAQC_CLASS_NAMES))]
 
     bars1 = ax.bar(x - width/2, baseline_vals, width, label='Baseline v1', color='#CCCCCC', edgecolor='#999999')
     bars2 = ax.bar(x + width/2, v2_vals, width, label='Improved v2', color=['#FF9900', '#FF0000', '#FFCC00', '#9900FF'], edgecolor='#333333')
@@ -516,13 +515,45 @@ if hasattr(metrics.box, 'maps') and len(metrics.box.maps) == len(NUSAQC_CLASS_NA
     plt.tight_layout(); plt.show()
 
 # %% [markdown]
-# # 6d. Ekspor ONNX & Copy Output
+# # 6d. Ekspor ONNX, CPU Latency Benchmark & Copy Output
 
 # %%
 # --- Export ONNX Model (640px untuk deploy Raspi) ---
 print("\n📦 Exporting ONNX (imgsz=640 untuk Raspberry Pi deploy)...")
 onnx_path = eval_model.export(format="onnx", imgsz=640, simplify=True)
 print(f"✅ ONNX exported: {onnx_path}")
+
+# --- CPU Latency Benchmarking (Raspberry Pi 5 Simulation: Multi-threading 4 Cores) ---
+print("\n" + "═" * 70)
+print("⏱️ BENCHMARKING CPU INFERENCE LATENCY (MODEL 2 YOLOv8s)")
+print("═" * 70)
+try:
+    import time
+    import onnxruntime as ort
+    
+    sess_options = ort.SessionOptions()
+    sess_options.intra_op_num_threads = 4
+    sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+    
+    dummy_input = np.random.randn(1, 3, 640, 640).astype(np.float32)
+    ort_session = ort.InferenceSession(str(onnx_path), sess_options, providers=["CPUExecutionProvider"])
+    in_name = ort_session.get_inputs()[0].name
+    
+    # Warmup
+    for _ in range(20):
+        _ = ort_session.run(None, {in_name: dummy_input})
+    
+    # Timed runs
+    t0 = time.time()
+    n_runs = 50
+    for _ in range(n_runs):
+        _ = ort_session.run(None, {in_name: dummy_input})
+    avg_ms = ((time.time() - t0) / n_runs) * 1000
+    fps = 1000.0 / avg_ms
+    print(f"  • ONNX CPU Latency (4 Cores, 640x640): {avg_ms:.2f} ms/frame ({fps:.1f} FPS)")
+    print(f"  • Target Penyisihan COMPFEST (<150 ms): {'✅ TERCAPAI' if avg_ms < 150 else '⚠️ MELEBIHI'}")
+except Exception as e:
+    print(f"  Note: Benchmark latency skipped ({e})")
 
 # Copy output ke lokasi utama
 out_dir = WORKING_DIR / "MODEL_OUTPUTS"

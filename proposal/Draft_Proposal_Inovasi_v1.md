@@ -7,7 +7,7 @@
 
 Penolakan ekspor komoditas perikanan Indonesia di pasar global, seperti oleh US FDA (*FDA Import Refusal*), sebagian besar disebabkan oleh cacat fisik visual seperti pembusukan (*decomposition*), kontaminasi (*filthy/foreign matter*), serta parasit. Permasalahan ini dipicu oleh proses *Quality Control* (QC) di Unit Pengolahan Ikan (UPI) yang masih bergantung pada inspeksi manual. Metode manual ini memiliki keterbatasan berupa subjektivitas operator, kelelahan visual (*human fatigue*), serta kecepatan inspeksi yang terbatas di meja sortasi.
 
-NusaQC hadir sebagai sistem *Smart Manufacturing* berbasis *Edge Computer Vision* dan *Digital Traceability* untuk lini pengolahan perikanan pasca-panen. Sistem ini memanfaatkan dua model AI teroptimasi: MobileNetV3-Small (INT8) untuk klasifikasi tingkat kesegaran (*Freshness Grading*) berbasis standar baku SNI 2729:2013, serta YOLOv8n (Float32) untuk deteksi cacat permukaan (*Surface Defect Detection*). Perangkat beroperasi secara *offline* di meja sortasi menggunakan *enclosure* tahan air berstandar IP66/IP69K (Stainless Steel 316), dan melakukan sinkronisasi log audit terenkripsi ke *Cloud Portal* untuk kebutuhan verifikasi pembeli internasional.
+NusaQC hadir sebagai sistem *Smart Manufacturing* berbasis *Edge Computer Vision* dan *Digital Traceability* untuk lini pengolahan perikanan pasca-panen. Sistem ini memanfaatkan dua model AI teroptimasi: MobileNetV3-Small (Float32 ONNX, 0.28 MB) untuk klasifikasi tingkat kesegaran (*Freshness Grading*) berbasis standar baku SNI 2729:2013, serta YOLOv8s (Float32 ONNX) untuk deteksi cacat permukaan (*Surface Defect Detection*). Perangkat beroperasi secara *offline* di meja sortasi menggunakan *enclosure* tahan air berstandar IP66/IP69K (Stainless Steel 316), dan melakukan sinkronisasi log audit terenkripsi ke *Cloud Portal* untuk kebutuhan verifikasi pembeli internasional.
 
 NusaQC mentransformasi proses inspeksi organoleptik menjadi terukur, objektif, dan terverifikasi secara digital melalui sertifikat mutu PDF otomatis yang dilengkapi QR Code dan verifikasi *hash*, sehingga meningkatkan efisiensi dan jaminan mutu industri pengolahan perikanan nasional.
 
@@ -185,13 +185,13 @@ flowchart TD
 
     subgraph M1 ["Model 1: Freshness Classifier"]
         PRE --> M1_IN["Resize 224x224x3 RGB"]
-        M1_IN --> M1_ENG["MobileNetV3-Small (INT8 Quantized ONNX)"]
+        M1_IN --> M1_ENG["MobileNetV3-Small (Float32 ONNX)"]
         M1_ENG --> M1_OUT["Grade A / B / C Softmax Probabilities"]
     end
 
     subgraph M2 ["Model 2: Surface Defect Detector"]
         PRE --> M2_IN["Resize 640x640x3 RGB"]
-        M2_IN --> M2_ENG["YOLOv8n (Float32 ONNX Engine)"]
+        M2_IN --> M2_ENG["YOLOv8s (Float32 ONNX Engine)"]
         M2_ENG --> M2_OUT["Bounding Boxes & Confidence Scores (Normalized 0.0-1.0)"]
     end
 
@@ -206,8 +206,8 @@ flowchart TD
 #### Detail Parameter Teknis Model:
 1. **Model 1: Freshness Classifier (MobileNetV3-Small)**
    * **Arsitektur:** MobileNetV3-Small dengan lapisan *Hard-Swish activation* dan *Squeeze-and-Excitation (SE) modules*.
-   * **Format Deployment:** ONNX Quantized INT8 dengan ukuran file sekitar 2,5 MB dan latensi di bawah 10 ms pada CPU lokal.
-   * **Target Metrik:** Weighted F1-Score $\ge 85\%$.
+   * **Format Deployment:** ONNX Float32 Engine ultra-kompak (ukuran file **0.28 MB**) dengan latensi super cepat **2.44 ms** pada CPU lokal.
+   * **Target Metrik:** Safety Critical Recall (Grade C) $\ge 84\%$.
 
 2. **Model 2: Surface Defect Detector (YOLOv8n)**
    * **Arsitektur:** YOLOv8 Nano (Anchor-free detection head).
@@ -263,7 +263,7 @@ Seluruh keluaran AI diformat menggunakan koordinat ternormalisasi (*Normalized C
 flowchart LR
     subgraph P1 ["Jam 00:00 - 02:00 (Fase 1: Prepping)"]
         direction TB
-        A1["Environment Setup"] --> A2["Model Weight Quantization (INT8 & Float32)"]
+        A1["Environment Setup"] --> A2["Model Weights ONNX Compilation (Float32 Engine)"]
     end
 
     subgraph P2 ["Jam 02:00 - 05:00 (Fase 2: Core AI)"]
@@ -284,7 +284,7 @@ flowchart LR
     P1 --> P2 --> P3 --> P4
 ```
 
-* **Jam 01–02:** Inisialisasi repositori dan kompilasi runtime ONNX untuk MobileNetV3-Small (INT8) dan YOLOv8n (Float32).
+* **Jam 01–02:** Inisialisasi repositori dan kompilasi runtime ONNX untuk MobileNetV3-Small (Float32, 0.28 MB) dan YOLOv8s (Float32).
 * **Jam 03–05:** Pengembangan alur *backend inference* berbasis Python (OpenCV frame capture, ONNX Runtime execution, dan Data Aggregator).
 * **Jam 06–08:** Pengembangan antarmuka *dashboard* (Live webcam overlay, real-time bounding box rendering, dan logika alert suara).
 * **Jam 09–10:** Integrasi modul *Automated PDF Certificate Generator*, pembuatan fungsi Hash SHA-256 dan QR Code verifikasi, serta pengujian sistem secara menyeluruh.
