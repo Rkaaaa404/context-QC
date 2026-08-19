@@ -603,11 +603,11 @@ services:
 | Parameter | Nilai |
 |-----------|-------|
 | Backbone | MobileNetV3-Small |
-| Export Format | ONNX (opset 17) |
+| Export Format | ONNX Float32 (opset 18, 0.28 MB) |
 | Input Shape | `(1, 3, 224, 224)` — RGB, normalized |
 | Output | 3 kelas: Grade A / Grade B / Grade C + confidence score |
-| Target mAP/Accuracy | ≥ 85% F1-score pada test set |
-| Inference latency (ONNX CPU RPi5) | ~150–300ms |
+| Empirical Performance | **75.75% Acc** (Grouped Split) / **84.64% Recall Grade C** (Safety Critical) |
+| Benchmark Latency (ONNX CPU) | **2.46 ms/frame (406.8 FPS)** |
 
 **Pre-Processing Pipeline (Solusi Koreksi dari Kritisasi Rayka):**
 
@@ -621,7 +621,7 @@ Tahap 1: Fish ROI Localization
 Input: Full frame foto ikan (dari kamera, ~1280×720px)
       │
       ▼
-YOLOv8n (digunakan juga sebagai localizer)
+YOLOv8s (digunakan juga sebagai localizer)
 Deteksi bounding box kepala ikan → Crop area kepala
       │
       ▼
@@ -660,13 +660,13 @@ Output: Grade A (segar) / Grade B (menurun) / Grade C (tidak layak ekspor)
 
 | Parameter | Nilai |
 |-----------|-------|
-| Backbone | YOLOv8n (Nano) |
-| Export Format | ONNX (opset 17) |
+| Backbone | YOLOv8s (Small) |
+| Export Format | ONNX Float32 (opset 20, 42.7 MB) |
 | Input Shape | `(1, 3, 640, 640)` |
 | Output | Bounding box + Label + Confidence + PASS/FAIL decision |
-| Target mAP | mAP50 ≥ 0.70 pada test set |
-| Inference latency (ONNX CPU RPi5) | ~470ms (benchmark: Okano et al., Algorithms 2025) |
-| Classes | `sisik_sisa`, `warna_abnormal`, `luka_robekan`, `foreign_object`, `lendir_berlebih` |
+| Empirical Performance | **mAP50 = 0.7310** (TTA: **0.7326**) / **mAP50-95 = 0.4984** |
+| Benchmark Latency (ONNX CPU) | **152.07 ms/frame (6.6 FPS)** |
+| Classes | `sisik_sisa`, `warna_abnormal`, `luka_robekan`, `lendir_berlebih` |
 
 **Decision Logic:**
 

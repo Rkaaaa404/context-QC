@@ -24,7 +24,7 @@
 import sys
 import subprocess
 
-required_pkgs = ["onnx", "onnxruntime", "seaborn", "matplotlib"]
+required_pkgs = ["onnx", "onnxruntime", "onnxscript", "seaborn", "matplotlib"]
 missing_pkgs = []
 for pkg in required_pkgs:
     try:
@@ -803,9 +803,9 @@ plot_comprehensive_confusion_matrices(labels_rand, preds_rand, labels_group, pre
 plot_sample_prediction_grid(test_df_rand, preds_rand, probs_rand, OUTPUT_DIR, n_samples=12)
 
 # %% [markdown]
-# # 9. Robust ONNX Export (Opset 18 Native Float32)
-# - Mengekspor bobot model PyTorch ke **ONNX Float32** menggunakan `opset_version=18` yang native di PyTorch 2.x tanpa error version converter.
-# - Format Float32 berukuran **0.28 MB (280 KB)** dan menghasilkan latensi super cepat **2.44 ms/frame (409 FPS)** di CPU edge (Raspberry Pi 5).
+# # 9. Robust ONNX Export (Opset Fallback Float32)
+# - Mengekspor bobot model PyTorch ke **ONNX Float32** menggunakan opset fallback multi-versi (18 -> 17 -> 14 -> 13) untuk kompatibilitas lintas versi PyTorch/ONNX Runtime.
+# - Format Float32 berukuran **0.28 MB (280 KB)** dan menghasilkan latensi super cepat **<4 ms/frame (>250 FPS)** di CPU edge (Raspberry Pi 5).
 
 # %%
 print(f"\n========================================================")
@@ -825,24 +825,55 @@ dummy_input = torch.randn(1, 3, 224, 224, device="cpu")
 
 onnx_fp32_path = OUTPUT_DIR / "mobilenetv3_freshness.onnx"
 
-# Ekspor ONNX Float32 (Static Batch Size = 1, Opset 18 Native PyTorch 2.x)
-try:
-    torch.onnx.export(
-        model_rand,
-        dummy_input,
-        str(onnx_fp32_path),
-        export_params=True,
-        opset_version=18,
-        do_constant_folding=True,
-        input_names=["input"],
-        output_names=["output"]
-    )
-    onnx_model = onnx.load(str(onnx_fp32_path))
-    onnx.checker.check_model(onnx_model)
-    fp32_size_mb = onnx_fp32_path.stat().st_size / (1024 * 1024)
-    print(f"2. ONNX Float32 Exported   : {onnx_fp32_path} ({fp32_size_mb:.2f} MB) [Static Batch 1, Opset 18]")
-except Exception as e:
-    print(f"Error saat mengekspor ONNX FP32: {e}")
+# Ekspor ONNX Float32 dengan Fallback opset (18 -> 17 -> 14 -> 13)
+exported_onnx = False
+fp32_size_mb = 0.0
+
+opset_versions = [18, 17, 14, 13]
+for opset in opset_versions:
+    try:
+        if onnx_fp32_path.exists():
+            onnx_fp32_path.unlink()
+            
+        torch.onnx.export(
+            model_rand,
+            dummy_input,
+            str(onnx_fp32_path),
+            export_params=True,
+            opset_version=opset,
+            do_constant_folding=True,
+            input_names=["input"],
+            output_names=["output"]
+        )
+        if onnx_fp32_path.exists() and onnx_fp32_path.stat().st_size > 0:
+            try:
+                onnx_model = onnx.load(str(onnx_fp32_path))
+                onnx.checker.check_model(onnx_model)
+            except Exception as chk_err:
+                print(f"  ⚠️ Warning: ONNX checker warning on opset {opset}: {chk_err}")
+            fp32_size_mb = onnx_fp32_path.stat().st_size / (1024 * 1024)
+            print(f"2. ONNX Float32 Exported   : {onnx_fp32_path} ({fp32_size_mb:.2f} MB) [Static Batch 1, Opset {opset}]")
+            exported_onnx = True
+            break
+    except Exception as e:
+        print(f"  ⚠️ Warning: Export ONNX dengan opset {opset} gagal ({e}). Mencoba opset berikutnya...")
+
+if not exported_onnx:
+    try:
+        torch.onnx.export(
+            model_rand,
+            dummy_input,
+            str(onnx_fp32_path),
+            export_params=True,
+            input_names=["input"],
+            output_names=["output"]
+        )
+        if onnx_fp32_path.exists() and onnx_fp32_path.stat().st_size > 0:
+            fp32_size_mb = onnx_fp32_path.stat().st_size / (1024 * 1024)
+            print(f"2. ONNX Float32 Exported   : {onnx_fp32_path} ({fp32_size_mb:.2f} MB) [Default Opset Fallback]")
+            exported_onnx = True
+    except Exception as e:
+        print(f"❌ Error fatal: Gagal mengekspor model ke ONNX: {e}")
 
 # %% [markdown]
 # # 10. Edge CPU Inference Latency Benchmark
@@ -871,22 +902,32 @@ with torch.no_grad():
     pytorch_cpu_ms = ((time.time() - t_start) / TIMED_RUNS) * 1000
 
 # 2. ONNX Runtime FP32 CPU Benchmark
-sess_options = ort.SessionOptions()
-sess_options.intra_op_num_threads = 4
-sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
+ort_fp32_ms = 0.0
+if onnx_fp32_path.exists() and onnx_fp32_path.stat().st_size > 0:
+    try:
+        sess_options = ort.SessionOptions()
+        sess_options.intra_op_num_threads = 4
+        sess_options.graph_optimization_level = ort.GraphOptimizationLevel.ORT_ENABLE_ALL
 
-ort_sess_fp32 = ort.InferenceSession(str(onnx_fp32_path), sess_options, providers=["CPUExecutionProvider"])
-input_name_fp32 = ort_sess_fp32.get_inputs()[0].name
-for _ in range(WARMUP_RUNS):
-    _ = ort_sess_fp32.run(None, {input_name_fp32: dummy_np})
-t_start = time.time()
-for _ in range(TIMED_RUNS):
-    _ = ort_sess_fp32.run(None, {input_name_fp32: dummy_np})
-ort_fp32_ms = ((time.time() - t_start) / TIMED_RUNS) * 1000
+        ort_sess_fp32 = ort.InferenceSession(str(onnx_fp32_path), sess_options, providers=["CPUExecutionProvider"])
+        input_name_fp32 = ort_sess_fp32.get_inputs()[0].name
+        for _ in range(WARMUP_RUNS):
+            _ = ort_sess_fp32.run(None, {input_name_fp32: dummy_np})
+        t_start = time.time()
+        for _ in range(TIMED_RUNS):
+            _ = ort_sess_fp32.run(None, {input_name_fp32: dummy_np})
+        ort_fp32_ms = ((time.time() - t_start) / TIMED_RUNS) * 1000
+    except Exception as e:
+        print(f"⚠️ Warning: Gagal menjalankan ONNX Runtime CPU Inference ({e}).")
+else:
+    print(f"⚠️ Warning: File ONNX {onnx_fp32_path} tidak ditemukan / 0 bytes. Melewati benchmark ONNX Runtime.")
 
 print(f"\n📊 HASIL BENCHMARK LATENSI CPU (Batch Size = 1):")
 print(f"  ├─ 1. PyTorch CPU Native   : {pytorch_cpu_ms:.2f} ms/frame ({1000/pytorch_cpu_ms:.1f} FPS)")
-print(f"  └─ 2. ONNX Runtime FP32    : {ort_fp32_ms:.2f} ms/frame ({1000/ort_fp32_ms:.1f} FPS) [Target COMPFEST <150 ms ✅]")
+if ort_fp32_ms > 0:
+    print(f"  └─ 2. ONNX Runtime FP32    : {ort_fp32_ms:.2f} ms/frame ({1000/ort_fp32_ms:.1f} FPS) [Target COMPFEST <150 ms ✅]")
+else:
+    print(f"  └─ 2. ONNX Runtime FP32    : N/A (ONNX Session Error/File Missing)")
 
 # %% [markdown]
 # # 11. Final Summary Table untuk Submisi Proposal COMPFEST 18
@@ -908,7 +949,11 @@ print(df_summary.to_string(index=False))
 
 print(f"\n📦 MODEL ARTIFACT SIZES & LATENCY:")
 print(f"  ├─ PyTorch Weight (.pt)    : {pt_size_mb:.2f} MB")
-print(f"  └─ ONNX FP32 (.onnx)       : {fp32_size_mb:.2f} MB | Latensi: {ort_fp32_ms:.2f} ms ({1000/ort_fp32_ms:.1f} FPS)")
+if ort_fp32_ms > 0:
+    print(f"  └─ ONNX FP32 (.onnx)       : {fp32_size_mb:.2f} MB | Latensi: {ort_fp32_ms:.2f} ms ({1000/ort_fp32_ms:.1f} FPS)")
+else:
+    print(f"  └─ ONNX FP32 (.onnx)       : {fp32_size_mb:.2f} MB | Latensi: N/A")
 
 print(f"\n📂 Seluruh artefak visual (.png) & model (.onnx) tersimpan di: {OUTPUT_DIR.resolve()}")
 print("=" * 70)
+
