@@ -16,6 +16,10 @@ datasets/
 *.h5
 *.pkl
 
+# Nested Webdev Repo
+webdev/
+.webdev/
+
 # Python & Environment
 __pycache__/
 *.pyc
