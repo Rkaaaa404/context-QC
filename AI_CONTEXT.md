@@ -1,80 +1,59 @@
 # AI Context Map — Project NusaQC (COMPFEST 18 AIC)
 
-File ini dibuat khusus sebagai acuan cepat (**Context Map**) untuk agen AI dan developer dalam menavigasi seluruh dokumen proyek **NusaQC** (Quality Control & Freshness Assessment berbasis AI).
+File ini dibuat khusus sebagai acuan cepat (**Context Map**) untuk agen AI dan developer dalam menavigasi seluruh dokumen dan arsitektur proyek **NusaQC** (Quality Control & Freshness Assessment berbasis AI).
 
 ---
 
 ## 📌 Quick Summary Proyek
 - **Nama Utama Proyek**: **NusaQC** (Quality Control & Visual Inspection System)
-  - *Catatan Naming*: Document lama/ideation kadang menyebut codename internal *NusaCatch*. Nama resmi submisi proposal dan sistem adalah **NusaQC**.
+  - *Catatan Naming*: Dokumen awal/ideation kadang menyebut codename internal *NusaCatch*. Nama resmi submisi proposal dan sistem adalah **NusaQC**.
 - **Kompetisi**: COMPFEST 18 - Artificial Intelligence Competition (AIC) · Smart Manufacturing Track
 - **Fokus Utama**: Sistem inspeksi mutu dan pemilah otomatis berbasis Computer Vision & IoT Conveyor Control untuk rantai pasok industri perikanan ekspor Indonesia (UPI).
-- **Arsitektur Dual AI Model**:
-  1. **Model 1 (Kesegaran / Freshness)**: Deep feature extraction (ResNet50 / MobileNetV3) + Classifier (Eye & Gill dataset: FFE & DaFiF) -> Output Grade A, B, C.
-  2. **Model 2 (Deteksi Defek / Defect Detection)**: YOLOv8 Object Detection dengan pseudo-labeling otomatis (3.200+ citra dari HF, Kaggle & Roboflow) -> Bounding Box 4 kelas defek permukaan (BGD, BRD, FDS, PD).
+- **Arsitektur Dual AI Model (Universal Single-Model Engines)**:
+  1. **Model 1 (Kesegaran / Freshness)**: MobileNetV3-Small Float32 ONNX (0.28 MB, 2.44 ms latency on CPU) -> Output Mutu Organoleptik SNI 2729:2013: **Grade A** (Prima), **Grade B** (Segar/Domestik), **Grade C** (Reject/Busuk).
+  2. **Model 2 (Deteksi Defek Permukaan / Defect Detector)**: YOLOv8s Float32 ONNX (42.7 MB) -> Deteksi & lokalisasi bounding box untuk **4 Kelas Cacat Standar**:
+     - `0: sisik_sisa` (Scale loss / Parasit Argulus, Anchor worm)
+     - `1: warna_abnormal` (Bacterial Red Disease, Aeromoniasis, Hemorrhage)
+     - `2: luka_robekan` (Skin ulcer, Fin rot, Jamur Saprolegniasis)
+     - `3: lendir_berlebih` (White tail disease, Excess clotted mucus)
+- **Metode Operasi**: **Synchronous Snapshot Mode** di conveyor sortasi (kamera overhead mengambil 1 snapshot per ikan, diproses instan <150 ms untuk memicu aktuator TowerLight & Conveyor Relay Ejector).
 
 ---
 
 ## 📂 Peta Struktur Direktori & Rujukan Konteks
 
-### 1. 📄 `proposal/` (Dokumen Proposal Hackathon)
-Gunakan direktori ini ketika AI perlu membaca, merevisi, atau mereferensikan isi proposal resmi:
-- [`FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/proposal/FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md) : **⭐ Proposal Utama Active (v3)** — Versi proposal paling mutakhir dengan statistik KKP/BPS/FDA terverifikasi & rancangan snapshot vs continuous conveyor.
-- [`Rencana_Struktur_Proposal.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/proposal/Rencana_Struktur_Proposal.md) : Breakdown outline dan struktur bab/bagian proposal.
-- [`Draft_Proposal_Inovasi_v1.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/proposal/Draft_Proposal_Inovasi_v1.md) & `.pdf` : Draft awal proposal inovasi (v1) *(Historical reference)*.
+### 1. 🌐 `webdev/` (Aplikasi Full-Stack Web & AI Serving)
+- `backend/` (FastAPI + ONNX Runtime CPU + SQLite + WebSockets):
+  - [`backend/app/ai/inference.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/app/ai/inference.py): Production ONNX Runtime CPU inference engine untuk MobileNetV3 dan YOLOv8s.
+  - [`backend/app/ai/preprocessor.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/app/ai/preprocessor.py): Transformasi citra (letterboxing 640x640 dan ImageNet normalization 224x224).
+  - [`backend/app/api/v1/inspections.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/app/api/v1/inspections.py): Endpoint `POST /api/v1/inspections/run` pemrosesan snapshot gambar.
+  - [`backend/app/api/v1/lots.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/app/api/v1/lots.py): Endpoint riwayat QC, pagination, dan ekspor CSV.
+  - [`backend/app/api/v1/dashboard.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/app/api/v1/dashboard.py): Live statistics (Total inspected, pass rate, fail rate, confidence).
+  - [`backend/models_weights/`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/backend/models_weights): Bobot model ONNX riil (`mobilenetv3_freshness.onnx` & `nusaqc_model2_defect_detector.onnx`).
+- `frontend/` (Next.js 16 + React 19 + Tailwind CSS):
+  - [`frontend/app/page.tsx`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/frontend/app/page.tsx): Live Monitoring Dashboard dengan integrasi WebSocket real-time.
+  - [`frontend/app/inspection/page.tsx`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/frontend/app/inspection/page.tsx): Halaman Inspeksi dengan upload snapshot, demo generator, dan render dynamic bounding boxes.
+  - [`frontend/app/history/page.tsx`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/frontend/app/history/page.tsx): Audit Log riwayat inspeksi, filter mutu, dan ekspor data CSV.
+  - [`frontend/app/history/[lotId]/page.tsx`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/webdev/frontend/app/history/%5BlotId%5D/page.tsx): Halaman detail inspeksi per lot dengan visualisasi bounding box defek dan sinyal conveyor.
 
-### 2. 💡 `ideation/` (Analisis Ide, Spesifikasi & Pembagian Tugas)
-Gunakan direktori ini ketika AI perlu memahami latar belakang ide, kritik, spesifikasi teknis, atau pembagian kerja tim:
-- [`Solidification_Main_Idea.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Solidification_Main_Idea.md) : Pembekuan ide utama & arsitektur solusi.
-- [`Laporan_Analisis_Bedah_Ide_NusaQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Laporan_Analisis_Bedah_Ide_NusaQC.md) : Bedah problem statement & pemetaan solusi.
-- [`Laporan_Evaluasi_Kritis_NusaQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Laporan_Evaluasi_Kritis_NusaQC.md) : Analisis kelemahan ide, risiko & mitigasi.
-- [`NusaCatch_Specs.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/NusaCatch_Specs.md) : Spesifikasi fitur & arsitektur sistem.
-- [`MASTER_CONTEXT_DAN_REVISI_TIM_NUSAQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/MASTER_CONTEXT_DAN_REVISI_TIM_NUSAQC.md) : Master Context & Lembar Kerja Revisi Tim NusaQC.
-- [`Perbaikan_Ide_Rayka.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Perbaikan_Ide_Rayka.md) : Catatan perbaikan ide spesifik.
-- [`Rekomendasi_Scope_Spesies_NusaQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Rekomendasi_Scope_Spesies_NusaQC.md) : Penentuan batasan jenis/spesies ikan.
-- [`Pembagian_Jobdesk.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Pembagian_Jobdesk.md) : Pembagian tugas anggota tim.
+### 2. 🤖 `models/` (Kode Machine Learning, Pipeline & Dataset)
+- `model_1/` (Freshness Engine):
+  - [`01_model1_full_pipeline.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/01_model1_full_pipeline.py): Pipeline training, anti-leakage augmentasi, evaluasi DaFiF & FFE, serta ONNX export.
+  - [`MODEL_1_PIPELINE_GUIDE.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/MODEL_1_PIPELINE_GUIDE.md): Panduan lengkap eksekusi dan arsitektur Model 1.
+  - [`REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL1.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL1.md): Rekap eksperimen dan mitigasi leakage latar belakang lab.
+- `model_2/` (Defect Detector):
+  - [`01_prepare_model2_dataset.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/01_prepare_model2_dataset.py): Inisialisasi folder, harmonisasi label, & dataset split.
+  - [`03_model2_kaggle_pipeline.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/03_model2_kaggle_pipeline.py) & `.ipynb`: Pipeline training YOLOv8s pada Kaggle GPU & ONNX export.
+  - [`04_model2_kaggle_pseudolabeling.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/04_model2_kaggle_pseudolabeling.py) & `.ipynb`: Pipeline pseudo-labeling otomatis (3.212 citra, 3.509 bounding box).
+  - [`ANNOTATION_GUIDE_MODEL2.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/ANNOTATION_GUIDE_MODEL2.md): Panduan visual 4 kelas defek permukaan ikan.
+  - [`MODEL_2_PIPELINE_GUIDE.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/MODEL_2_PIPELINE_GUIDE.md): Panduan eksekusi pipeline Model 2.
+  - [`REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL2.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL2.md): Rekap rekayasa teknis & eksperimen Model 2.
 
-### 3. 🔍 `research/` (Guidebook, Analisis Pemenang & Sitasi Data)
-Gunakan direktori ini ketika AI perlu mencocokkan aturan lomba atau benchmarking dengan pemenang tahun lalu:
-- [`guidebook.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/guidebook.md) : Guidebook resmi kompetisi COMPFEST 18.
-- [`past_winners_analysis.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/past_winners_analysis.md) : Rangkuman & pola keberhasilan pemenang kompetisi terdahulu.
-- [`Verifikasi_Sitasi_dan_Data_NusaQC.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/Verifikasi_Sitasi_dan_Data_NusaQC.md) : Verifikasi sitasi ilmiah & validasi data.
-- [`PROMPT_KONSULTASI_AI.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/PROMPT_KONSULTASI_AI.md) : Collection prompt yang digunakan untuk konsultasi AI.
-- `past_winners/` : Transkrip/berkas karya pemenang lalu ([ADA_SPARTANS.txt](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/past_winners/ADA_SPARTANS.txt), [Mechaminds.txt](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/past_winners/Mechaminds.txt), [tunarasa.txt](file:///D:/main/Documents/explore/compe/hackhathon/AIC/research/past_winners/tunarasa.txt)).
+### 3. 📄 `proposal/` (Dokumen Proposal Hackathon)
+- [`FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/proposal/FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md): Proposal Utama Active (v3) dengan data statistik KKP/BPS/FDA & rancangan sistem.
+- [`Rencana_Struktur_Proposal.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/proposal/Rencana_Struktur_Proposal.md): Breakdown outline bab proposal.
 
-### 4. 📚 `docs/` (Paper Referensi & Spesifikasi Dataset)
-Gunakan direktori ini untuk mengakses studi literatur ilmiah dan spesifikasi teknis dataset:
-- `md/` : Ringkasan paper & spesifikasi:
-  - [`Deep_feature_optimization_paper.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/Deep_feature_optimization_paper.md) : Ringkasan paper utama optimasi fitur deep learning.
-  - [`dafif.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/dafif.md) : Ringkasan paper/dataset DaFiF.
-  - [`datasets.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/datasets.md) : Ringkasan analisis dataset.
-  - [`spesifikasi_dataset_dan_scope_ai.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/spesifikasi_dataset_dan_scope_ai.md) : Scope AI & pemetaannya terhadap dataset.
-- `pdf/` : File asli PDF paper ilmiah.
-
-### 5. 🤖 `models/` (Kode Machine Learning, Pipeline & Dataset)
-Gunakan direktori ini untuk pengerjaan teknis ML, training, dan visualisasi:
-- `model_1/` :
-  - [`01_model1_full_pipeline.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/01_model1_full_pipeline.py) : Script lengkap training, ekstraksi fitur & evaluasi Model 1 (Eye & Gill).
-  - [`MODEL_1_PIPELINE_GUIDE.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/MODEL_1_PIPELINE_GUIDE.md) : Panduan menjalankan dan memahami pipeline Model 1.
-  - [`REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL1.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_1/REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL1.md) : Rekap rekayasa fitur & eksperimen Model 1.
-- `model_2/` :
-  - [`01_prepare_model2_dataset.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/01_prepare_model2_dataset.py) : Script inisialisasi folder, harmonisasi label, & dataset split.
-  - [`02_label_studio_config.xml`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/02_label_studio_config.xml) : Template XML Label Studio 4 kelas (BGD, BRD, FDS, PD).
-  - [`03_model2_kaggle_pipeline.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/03_model2_kaggle_pipeline.py) & `.ipynb` : Pipeline Kaggle GPU (YOLOv8s, Evaluasi & ONNX Export).
-  - [`04_model2_kaggle_pseudolabeling.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/04_model2_kaggle_pseudolabeling.py) & `.ipynb` : Auto Pseudo-Labeling pipeline (HF panda992 + Alaa Mahmoud + Roboflow -> 3.200+ citra).
-  - [`05_label_studio_converter.py`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/05_label_studio_converter.py) : Converter anotasik Label Studio ke format YOLO.
-  - [`ANNOTATION_GUIDE_MODEL2.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/ANNOTATION_GUIDE_MODEL2.md) : Panduan taksonomi visual 4 kelas defek permukaan ikan.
-  - [`MODEL_2_PIPELINE_GUIDE.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/MODEL_2_PIPELINE_GUIDE.md) : Panduan eksekusi pipeline Model 2.
-  - [`REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL2.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/models/model_2/REKAP_DISKUSI_DAN_REKAYASA_AI_MODEL2.md) : Rekap rekayasa teknis & eksperimen Model 2.
-- `datasets/` (*Git Ignored*):
-  - `model-1/` : Folder lokal untuk dataset DaFiF & FFE.
-  - `model-2/` : Folder lokal untuk dataset roboflow-fish-disease, nusaqc_extended_pseudo_dataset, dll.
-
----
-
-## ⚡ Panduan Pemanggilan Context untuk AI (Prompting Tip)
-Ketika memberikan instruksi baru kepada AI, Anda cukup merujuk bagian ini:
-- **Untuk penulisan/revisi proposal**: *"Rujuk proposal/FIX_NusaQC_Proposal_AIC_COMPFEST18_2026_v3.md dan guidebook di research/guidebook.md"*
-- **Untuk pengembangan Model 1 (Freshness)**: *"Rujuk pipeline di models/model_1/01_model1_full_pipeline.py dan panduannya di models/model_1/MODEL_1_PIPELINE_GUIDE.md"*
-- **Untuk pengembangan Model 2 (Defect Detection)**: *"Rujuk pipeline di models/model_2/03_model2_kaggle_pipeline.py dan models/model_2/MODEL_2_PIPELINE_GUIDE.md"*
-- **Untuk validasi ide/fitur**: *"Cek ideation/Solidification_Main_Idea.md dan docs/md/spesifikasi_dataset_dan_scope_ai.md"*
+### 4. 💡 `ideation/` & 📚 `docs/`
+- [`docs/md/spesifikasi_dataset_dan_scope_ai.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/spesifikasi_dataset_dan_scope_ai.md): Spesifikasi komprehensif dataset, taksonomi label, dan integrasi proposal.
+- [`docs/md/dafif.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/docs/md/dafif.md): Ringkasan dataset DaFiF dan pemetaan organoleptik SNI.
+- [`ideation/Solidification_Main_Idea.md`](file:///D:/main/Documents/explore/compe/hackhathon/AIC/ideation/Solidification_Main_Idea.md): Pembekuan ide utama & arsitektur solusi.

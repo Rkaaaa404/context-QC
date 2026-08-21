@@ -129,20 +129,19 @@ Dataset B dirancang untuk melatih **Model 2 (Surface Contamination & Defect Dete
 ### 🛡️ Solusi Engineering Handling Label Heterogen & Missing Annotations
 
 #### Solusi 1: Taxonomy Harmonization Matrix (Penyelarasan Kelas)
-Semua label heterogen dari seluruh dataset B dipetakan ke dalam **5 Standard Bounding Box Classes NusaQC**:
+Semua label heterogen dari seluruh dataset patologi diselaraskan ke dalam **4 Standard Bounding Box Classes NusaQC**:
 
 ```
                        TAXONOMY HARMONIZATION MATRIX
                        ──────────────────────────────
-Roboflow (Dataset 6) / BD Fish (Dataset 1)              NusaQC Standard Classes
-──────────────────────────────────────────              ───────────────────────
+Roboflow / BD Fish / Alaa Mahmoud                       NusaQC Standard Classes
+─────────────────────────────────                       ───────────────────────
 • Scale Loss, Missing Scales, Parasite Attach   ──────►  [ 0: sisik_sisa ]
 • BRD, Red Spot, Aeromoniasis, Black Gill,      ──────►  [ 1: warna_abnormal ]
-  Skin Discoloration
-• BDA, Skin Ulcer, Winter Ulcer Disease         ──────►  [ 2: luka_robekan ]
-  (Severe Cavity Ulceration), Tearing, Cut
-• Foreign Object, Debris, Plastic Particle      ──────►  [ 3: foreign_object ]
-• Excess Mucus, Clotted White Mucus             ──────►  [ 4: lendir_berlebih ]
+  Hemorrhage, Skin Discoloration
+• BDA, Skin Ulcer, Winter Ulcer Disease,        ──────►  [ 2: luka_robekan ]
+  Fin Rot, Tail Rot, Saprolegniasis Fungus
+• Excess Mucus, Clotted White Mucus, WTD        ──────►  [ 3: lendir_berlebih ]
 ```
 
 ---
